@@ -3,6 +3,7 @@ using BenchmarkDotNet.Attributes;
 namespace ExemplosMs;
 
 [MemoryDiagnoser]
+[ThreadingDiagnoser]
 public class ExemploMs
 {
     private string _text;
@@ -26,59 +27,48 @@ public class ExemploMs
 
 
     [Benchmark]
-    public void Execute()
+    public int Execute()
     {
-        for (int i = 0; i < 100_000; i++)
-        {
-            var searchTerm = "data";
+        var searchTerm = "data";
 
-            //Convert the string into an array of words
-            char[] separators = ['.', '?', '!', ' ', ';', ':', ','];
-            var source = _text.Split(separators, StringSplitOptions.RemoveEmptyEntries);
+        //Convert the string into an array of words
+        char[] separators = ['.', '?', '!', ' ', ';', ':', ','];
+        var source = _text.Split(separators, StringSplitOptions.RemoveEmptyEntries);
 
-            // Create the query.  Use the InvariantCultureIgnoreCase comparison to match "data" and "Data"
-            var matchQuery = from word in source
-                where word.Equals(searchTerm, StringComparison.InvariantCultureIgnoreCase)
-                select word;
+        // Create the query.  Use the InvariantCultureIgnoreCase comparison to match "data" and "Data"
+        var matchQuery = from word in source
+            where word.Equals(searchTerm, StringComparison.InvariantCultureIgnoreCase)
+            select word;
 
-            // Count the matches, which executes the query.
-            int wordCount = matchQuery.Count();
-            Console.WriteLine($"""{wordCount} occurrences(s) of the search term "{searchTerm}" were found.""");
-            /* Output:
-               3 occurrences(s) of the search term "data" were found.
-            */
-        }
+        // Count the matches, which executes the query.
+        return matchQuery.Count();
     }
 
     [Benchmark]
-    public void ExecuteOtimizado()
+    public int ExecuteOtimizado()
     {
-        for (var i = 0; i < 100_000; i++)
+        var searchTerm = "data".AsSpan();
+        var textAsSpan = _text.AsSpan();
+
+        var nameCount = 0;
+
+        for (var x = 0; x < textAsSpan.Length; x++)
         {
-            var searchTerm = "data".AsSpan();
-            var textAsSpan = _text.AsSpan();
+            if (textAsSpan[x] != searchTerm[0] && (textAsSpan[x] + 32) != searchTerm[0])
+                continue;
 
-            using var enumerator = textAsSpan.GetEnumerator();
-            var index = 0;
-            var nameCount = 0;
+            if (textAsSpan[x..].Length < searchTerm.Length)
+                return 0;
 
-            while (enumerator.MoveNext())
+            if (textAsSpan.Slice(x, 4).Equals(searchTerm, StringComparison.InvariantCultureIgnoreCase))
             {
-                if (textAsSpan[index] == searchTerm[0] || (textAsSpan[index] + 32) == searchTerm[0])
-                {
-                    if (textAsSpan.Slice(index).Length < searchTerm.Length)
-                        return;
-
-                    if (textAsSpan.Slice(index, 4).Equals(searchTerm, StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        nameCount++;
-                    }
-                }
-
-                index++;
+                nameCount++;
             }
-
-            Console.WriteLine($"""{nameCount} occurrences(s) of the search term "{searchTerm}" were found.""");
         }
+
+        return nameCount;
     }
+
+    // criar um exemplo onde eu preciso utilizar a string que manipulei com o span, para mostrar que nem sempre utilizar o span eh o caminho
+    // se eu precisar usar a string. O readonlyb span eh ainda mais lento quando se quer utilizar a string que estamos manipulando.
 }
